@@ -3,48 +3,75 @@
 
 #include <src/Scene/Scene.h>
 
-#include <src/Scene/Cube.h>
 #include <src/Scene/Plane.h>
 #include <src/Scene/Sphere.h>
 
 #include <glm/geometric.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <random>
 
 void Scene::build(
 	void)
 {
-	m_Camera.setPosition({0.0f, 1.5f, -4.0f});
-	m_Camera.setTarget({0.0f, 0.0f, 0.0f});
+	m_Camera.setPosition({0.0f, 1.6f, -6.0f});
+	m_Camera.setTarget({0.0f, 0.1f, 0.0f});
 	m_Camera.setFieldOfView(45.0f);
 
 	const MaterialIndex slate = createMaterial({{0.58f, 0.58f, 0.60f}, MaterialType::Lambertian});
-	const MaterialIndex ember = createMaterial({{0.85f, 0.34f, 0.14f}, MaterialType::Lambertian});
 	const MaterialIndex chrome = createMaterial({{0.95f, 0.95f, 0.97f}, MaterialType::Mirror});
+	const MaterialIndex brass = createMaterial({{0.94f, 0.76f, 0.38f}, MaterialType::Mirror});
+
+	const MaterialIndex tints[] = {
+		createMaterial({{0.85f, 0.34f, 0.14f}, MaterialType::Lambertian}),
+		createMaterial({{0.22f, 0.48f, 0.36f}, MaterialType::Lambertian}),
+		createMaterial({{0.28f, 0.36f, 0.68f}, MaterialType::Lambertian}),
+		createMaterial({{0.74f, 0.70f, 0.32f}, MaterialType::Lambertian})};
 
 	Plane ground;
 	ground.setPosition({0.0f, -0.5f, 0.0f});
-	ground.setScale({12.0f, 1.0f, 12.0f});
+	ground.setScale({40.0f, 1.0f, 40.0f});
 	ground.setMaterial(slate);
-
-	Cube cube;
-	cube.setRotation({0.0f, 22.0f, 0.0f});
-	cube.setMaterial(ember);
-
-	Sphere sphere;
-	sphere.setPosition({1.4f, 0.25f, 0.2f});
-	sphere.setScale(1.5f);
-	sphere.setMaterial(chrome);
-
-	Cube pillar;
-	pillar.setPosition({-1.5f, 0.25f, 0.6f});
-	pillar.setScale({0.4f, 1.5f, 0.4f});
-	pillar.setMaterial(ember);
-
 	add(ground);
-	add(cube);
-	add(sphere);
-	add(pillar);
+
+	Sphere mirror;
+	mirror.setPosition({0.0f, 0.25f, 0.0f});
+	mirror.setScale(1.5f);
+	mirror.setMaterial(chrome);
+	add(mirror);
+
+	Sphere gold;
+	gold.setPosition({-2.1f, 0.05f, -0.6f});
+	gold.setScale(1.1f);
+	gold.setMaterial(brass);
+	add(gold);
+
+	std::mt19937 noise(0x2545f491u);
+	std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+
+	for (std::size_t i = 0; i < 11; ++i)
+	{
+		for (std::size_t j = 0; j < 10; ++j)
+		{
+			const float diameter = 0.16f + (unit(noise) * 0.38f);
+			const float x = ((static_cast<float>(i) - 5.0f) * 1.15f) + ((unit(noise) - 0.5f) * 0.7f);
+			const float z = ((static_cast<float>(j) - 3.0f) * 1.15f) + ((unit(noise) - 0.5f) * 0.7f);
+			const float pick = unit(noise);
+
+			if ((std::sqrt((x * x) + (z * z)) < 1.5f) or
+				(std::sqrt(((x + 2.1f) * (x + 2.1f)) + ((z + 0.6f) * (z + 0.6f))) < 1.2f))
+			{
+				continue;
+			}
+
+			Sphere ball;
+			ball.setPosition({x, -0.5f + (diameter * 0.5f), z});
+			ball.setScale(diameter);
+			ball.setMaterial((pick < 0.12f) ? chrome : tints[static_cast<std::size_t>(pick * 4.0f) % 4]);
+			add(ball);
+		}
+	}
 }
 
 MaterialIndex Scene::createMaterial(
