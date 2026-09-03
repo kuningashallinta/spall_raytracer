@@ -1,0 +1,7 @@
+---
+Checks: '-*,readability-identifier-naming'
+CheckOptions:
+  readability-identifier-naming.FunctionCase: camelBack
+  readability-identifier-naming.MethodCase: camelBack
+  readability-identifier-naming.FunctionIgnoredRegexp: '^d3d11[A-Z0-9].*$'
+  readability-identifier-naming.MethodIgnoredRegexp: '^d3d11[A-Z0-9].*$'

@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="spall_raytracer/spall_raytracer.vcxproj" Id="bd830267-84ff-4c42-9b02-bf1f5e19e0a2" />
+</Solution>
