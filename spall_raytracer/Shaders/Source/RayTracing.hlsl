@@ -58,6 +58,50 @@ cbuffer FrameConstants : register(b2)
 RWStructuredBuffer<MaterialRecord> Materials : register(u3);
 RWStructuredBuffer<Vertex> Vertices : register(u4);
 
+#ifdef __spirv__
+	[[vk::image_format("rgba32f")]]
+#endif
+RWTexture2D<float4> Accumulation : register(u5);
+
+struct PushConstants
+{
+	uint FrameIndex;
+};
+
+#ifdef __spirv__
+	[[vk::push_constant]] ConstantBuffer<PushConstants> Push;
+#else
+	ConstantBuffer<PushConstants> Push : register(b13);
+#endif
+
+static float radicalInverse(
+	uint bits)
+{
+	bits = (bits << 16u) | (bits >> 16u);
+	bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+	bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+	bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+	bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+
+	return float(bits) * 2.3283064365386963e-10f;
+}
+
+static float halton3(
+	uint index)
+{
+	float result = 0.0f;
+	float fraction = 1.0f / 3.0f;
+
+	while (index > 0u)
+	{
+		result += fraction * float(index % 3u);
+		index /= 3u;
+		fraction /= 3.0f;
+	}
+
+	return result;
+}
+
 static float3 linearToSrgb(
 	float3 color)
 {
@@ -135,7 +179,8 @@ static void shade(
 void rayGenMain(void)
 {
 	const uint2 pixel = DispatchRaysIndex().xy;
-	const float2 uv = (float2(pixel) + 0.5f) / float2(DispatchRaysDimensions().xy);
+	const float2 jitter = float2(radicalInverse(Push.FrameIndex + 1u), halton3(Push.FrameIndex + 1u));
+	const float2 uv = (float2(pixel) + jitter) / float2(DispatchRaysDimensions().xy);
 	const float2 ndc = float2((uv.x * 2.0f) - 1.0f, 1.0f - (uv.y * 2.0f));
 
 	RayDesc ray;
@@ -172,7 +217,11 @@ void rayGenMain(void)
 		ray.Direction = payload.ScatterDirection;
 	}
 
-	Output[pixel] = float4(linearToSrgb(radiance), 1.0f);
+	const float4 previous = (Push.FrameIndex == 0u) ? float4(0.0f, 0.0f, 0.0f, 0.0f) : Accumulation[pixel];
+	const float4 accumulated = previous + float4(radiance, 1.0f);
+
+	Accumulation[pixel] = accumulated;
+	Output[pixel] = float4(linearToSrgb(accumulated.rgb / accumulated.w), 1.0f);
 }
 
 [shader("miss")]

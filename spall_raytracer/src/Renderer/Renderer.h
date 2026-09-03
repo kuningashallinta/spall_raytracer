@@ -12,9 +12,9 @@
 #include <spall/Pipeline/Binding/IResourceSetLayout.h>
 #include <spall/Pipeline/Pipeline/IPipeline.h>
 #include <spall/Pipeline/Shader/IShader.h>
+#include <spall/Resources/Buffer/IBuffer.h>
 #include <spall/Resources/Texture/ITexture2D.h>
 #include <spall/Resources/TextureView/ITextureView.h>
-#include <spall/Resources/Buffer/IBuffer.h>
 #include <spall/SwapChain/ISwapChain.h>
 
 #include <src/Renderer/SceneResources.h>
@@ -46,6 +46,8 @@ private:
 
 	spall::Resource<spall::ITexture2D> m_Output;
 	spall::Resource<spall::ITextureView> m_OutputView;
+	spall::Resource<spall::ITexture2D> m_Accumulation;
+	spall::Resource<spall::ITextureView> m_AccumulationView;
 
 	SceneResources m_SceneResources;
 	spall::Resource<spall::IBuffer> m_Constants;
@@ -59,4 +61,5 @@ private:
 	spall::Resource<spall::IPipeline> m_Pipeline;
 
 	std::vector<spall::Resource<spall::ICommandList>> m_CommandLists;
+	std::uint32_t m_FrameIndex = 0;
 };

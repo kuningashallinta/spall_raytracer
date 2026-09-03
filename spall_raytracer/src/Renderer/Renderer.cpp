@@ -141,7 +141,7 @@ spall::Status Renderer::createOutput(
 	textureInfo.Format = OutputFormat;
 	textureInfo.Usage = spall::TextureUsageFlags::Storage | spall::TextureUsageFlags::TransferSource;
 
-	const spall::Status status = m_Device->resources().createTexture2D(textureInfo, &m_Output);
+	spall::Status status = m_Device->resources().createTexture2D(textureInfo, &m_Output);
 
 	if (status != spall::SUCCESS)
 	{
@@ -152,7 +152,26 @@ spall::Status Renderer::createOutput(
 	viewInfo.Texture = m_Output.get();
 	viewInfo.Aspects = spall::TextureAspectFlags::Color;
 
-	return m_Device->resources().createTextureView(viewInfo, &m_OutputView);
+	status = m_Device->resources().createTextureView(viewInfo, &m_OutputView);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	textureInfo.Format = AccumulationFormat;
+	textureInfo.Usage = spall::TextureUsageFlags::Storage;
+
+	status = m_Device->resources().createTexture2D(textureInfo, &m_Accumulation);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	viewInfo.Texture = m_Accumulation.get();
+
+	return m_Device->resources().createTextureView(viewInfo, &m_AccumulationView);
 }
 
 spall::Status Renderer::buildScene(
@@ -280,7 +299,8 @@ spall::Status Renderer::createPipeline(
 		{OutputBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration},
 		{ConstantsBinding, spall::ResourceBindingType::UniformBuffer, tracingStages},
 		{MaterialBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
-		{VertexBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit}};
+		{VertexBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
+		{AccumulationBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration}};
 
 	spall::ResourceSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.Bindings = bindings;
@@ -308,6 +328,7 @@ spall::Status Renderer::createPipeline(
 	pipelineInfo.MaxAttributeSize = MaxAttributeSize;
 	pipelineInfo.MaxRecursionDepth = MaxRecursionDepth;
 	pipelineInfo.ResourceSetLayouts = layouts;
+	pipelineInfo.PushConstants = {spall::ShaderStageFlags::RayGeneration, sizeof(std::uint32_t)};
 
 	status = m_Device->pipelines().createRayTracingPipeline(pipelineInfo, &m_Pipeline);
 
@@ -316,7 +337,7 @@ spall::Status Renderer::createPipeline(
 		return status;
 	}
 
-	spall::ResourceWrite writes[5] = {};
+	spall::ResourceWrite writes[6] = {};
 	writes[0].Binding = SceneBinding;
 	writes[0].Type = spall::ResourceBindingType::AccelerationStructure;
 	writes[0].AccelerationStructure = &m_SceneResources.topLevel();
@@ -332,6 +353,9 @@ spall::Status Renderer::createPipeline(
 	writes[4].Binding = VertexBinding;
 	writes[4].Type = spall::ResourceBindingType::StorageBuffer;
 	writes[4].Buffer = &m_SceneResources.vertexBuffer();
+	writes[5].Binding = AccumulationBinding;
+	writes[5].Type = spall::ResourceBindingType::StorageTexture;
+	writes[5].TextureView = m_AccumulationView.get();
 
 	spall::ResourceSetCreateInfo setInfo = {};
 	setInfo.Layout = m_ResourceSetLayout.get();
@@ -386,6 +410,13 @@ spall::Status Renderer::renderFrame(
 		return status;
 	}
 
+	status = commands.setPushConstants(spall::ShaderStageFlags::RayGeneration, 0, m_FrameIndex);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
 	status = commands.dispatchRays(WindowWidth, WindowHeight, 1);
 
 	if (status != spall::SUCCESS)
@@ -414,7 +445,16 @@ spall::Status Renderer::renderFrame(
 		return status;
 	}
 
-	return m_Device->graphicsQueue().present(*frame);
+	status = m_Device->graphicsQueue().present(*frame);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	++m_FrameIndex;
+
+	return {};
 }
 
 void Renderer::waitIdle(
