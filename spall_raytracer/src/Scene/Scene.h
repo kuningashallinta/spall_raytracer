@@ -24,6 +24,12 @@ struct MaterialRecord
 {
 	glm::vec4 Albedo;
 	std::uint32_t Type;
+	std::uint32_t Unused[3];
+};
+
+struct InstanceRecord
+{
+	std::uint32_t MaterialIndex;
 	std::uint32_t FirstVertex;
 	std::uint32_t Unused[2];
 };
@@ -32,12 +38,15 @@ class Scene
 {
 public:
 	void build(void);
+
+	MaterialIndex createMaterial(const Material& material);
 	void add(const Shape& shape);
 
 	std::span<const Vertex> vertices(void) const;
 	std::span<const spall::AccelerationStructureAabb> aabbs(void) const;
 	std::span<const SceneInstance> instances(void) const;
 	std::span<const MaterialRecord> materials(void) const;
+	std::span<const InstanceRecord> instanceRecords(void) const;
 
 	FrameConstants frameConstants(float aspectRatio) const;
 
@@ -45,7 +54,10 @@ private:
 	std::vector<Vertex> m_Vertices;
 	std::vector<spall::AccelerationStructureAabb> m_Aabbs;
 	std::vector<SceneInstance> m_Instances;
-	std::vector<MaterialRecord> m_Materials;
+
+	std::vector<Material> m_Materials;
+	std::vector<MaterialRecord> m_MaterialRecords;
+	std::vector<InstanceRecord> m_InstanceRecords;
 
 	Camera m_Camera;
 	glm::vec3 m_LightDirection = {0.4f, 0.8f, -0.45f};

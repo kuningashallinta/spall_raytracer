@@ -15,6 +15,12 @@ struct MaterialRecord
 {
 	float4 Albedo;
 	uint Type;
+	uint3 Unused;
+};
+
+struct InstanceRecord
+{
+	uint MaterialIndex;
 	uint FirstVertex;
 	uint2 Unused;
 };
@@ -57,6 +63,7 @@ cbuffer FrameConstants : register(b2)
 
 RWStructuredBuffer<MaterialRecord> Materials : register(u3);
 RWStructuredBuffer<Vertex> Vertices : register(u4);
+RWStructuredBuffer<InstanceRecord> Instances : register(u6);
 
 #ifdef __spirv__
 	[[vk::image_format("rgba32f")]]
@@ -246,8 +253,9 @@ void closestHitMain(
 	inout RayPayload payload,
 	in BuiltInTriangleIntersectionAttributes attributes)
 {
-	const MaterialRecord material = Materials[InstanceID()];
-	const uint base = material.FirstVertex + (PrimitiveIndex() * 3);
+	const InstanceRecord instance = Instances[InstanceID()];
+	const MaterialRecord material = Materials[instance.MaterialIndex];
+	const uint base = instance.FirstVertex + (PrimitiveIndex() * 3);
 
 	const float3 a = Vertices[base + 0].Position;
 	const float3 b = Vertices[base + 1].Position;
@@ -296,5 +304,5 @@ void proceduralClosestHitMain(
 	inout RayPayload payload,
 	in SphereAttributes attributes)
 {
-	shade(payload, worldNormal(attributes.Normal), Materials[InstanceID()]);
+	shade(payload, worldNormal(attributes.Normal), Materials[Instances[InstanceID()].MaterialIndex]);
 }

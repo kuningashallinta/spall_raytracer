@@ -130,6 +130,22 @@ spall::Status SceneResources::initialize(
 		return status;
 	}
 
+	const std::span<const InstanceRecord> instanceRecords = scene.instanceRecords();
+
+	spall::BufferCreateInfo instanceRecordInfo = {};
+	instanceRecordInfo.Size = static_cast<std::uint32_t>(instanceRecords.size_bytes());
+	instanceRecordInfo.Usage = spall::BufferUsageFlags::Storage;
+
+	status = device.resources().createBufferWithData(
+		instanceRecordInfo,
+		std::as_bytes(instanceRecords),
+		&m_InstanceRecords);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
 	spall::AccelerationStructureCreateInfo topLevelInfo = {};
 	topLevelInfo.Type = spall::AccelerationStructureType::TopLevel;
 	topLevelInfo.InstanceBuffer = m_Instances.get();
@@ -170,4 +186,10 @@ spall::IBuffer& SceneResources::materialBuffer(
 	void) const
 {
 	return *m_Materials;
+}
+
+spall::IBuffer& SceneResources::instanceRecordBuffer(
+	void) const
+{
+	return *m_InstanceRecords;
 }

@@ -9,6 +9,8 @@
 
 #include <glm/geometric.hpp>
 
+#include <algorithm>
+
 void Scene::build(
 	void)
 {
@@ -16,23 +18,53 @@ void Scene::build(
 	m_Camera.setTarget({0.0f, 0.0f, 0.0f});
 	m_Camera.setFieldOfView(45.0f);
 
+	const MaterialIndex slate = createMaterial({{0.58f, 0.58f, 0.60f}, MaterialType::Lambertian});
+	const MaterialIndex ember = createMaterial({{0.85f, 0.34f, 0.14f}, MaterialType::Lambertian});
+	const MaterialIndex chrome = createMaterial({{0.95f, 0.95f, 0.97f}, MaterialType::Mirror});
+
 	Plane ground;
 	ground.setPosition({0.0f, -0.5f, 0.0f});
 	ground.setScale({12.0f, 1.0f, 12.0f});
-	ground.setMaterial({{0.58f, 0.58f, 0.60f}, MaterialType::Lambertian});
+	ground.setMaterial(slate);
 
 	Cube cube;
 	cube.setRotation({0.0f, 22.0f, 0.0f});
-	cube.setMaterial({{0.85f, 0.34f, 0.14f}, MaterialType::Lambertian});
+	cube.setMaterial(ember);
 
 	Sphere sphere;
 	sphere.setPosition({1.4f, 0.25f, 0.2f});
 	sphere.setScale(1.5f);
-	sphere.setMaterial({{0.95f, 0.95f, 0.97f}, MaterialType::Mirror});
+	sphere.setMaterial(chrome);
+
+	Cube pillar;
+	pillar.setPosition({-1.5f, 0.25f, 0.6f});
+	pillar.setScale({0.4f, 1.5f, 0.4f});
+	pillar.setMaterial(ember);
 
 	add(ground);
 	add(cube);
 	add(sphere);
+	add(pillar);
+}
+
+MaterialIndex Scene::createMaterial(
+	const Material& material)
+{
+	const auto existing = std::ranges::find(m_Materials, material);
+
+	if (existing != m_Materials.end())
+	{
+		return static_cast<MaterialIndex>(existing - m_Materials.begin());
+	}
+
+	MaterialRecord record = {};
+	record.Albedo = glm::vec4(material.Albedo, 0.0f);
+	record.Type = static_cast<std::uint32_t>(material.Type);
+
+	m_Materials.push_back(material);
+	m_MaterialRecords.push_back(record);
+
+	return static_cast<MaterialIndex>(m_Materials.size() - 1);
 }
 
 void Scene::add(
@@ -44,9 +76,8 @@ void Scene::add(
 	instance.InstanceId = static_cast<std::uint32_t>(m_Instances.size());
 	instance.Type = shape.geometryType();
 
-	MaterialRecord record = {};
-	record.Albedo = glm::vec4(shape.material().Albedo, 0.0f);
-	record.Type = static_cast<std::uint32_t>(shape.material().Type);
+	InstanceRecord record = {};
+	record.MaterialIndex = shape.material();
 
 	switch (instance.Type)
 	{
@@ -76,7 +107,7 @@ void Scene::add(
 	}
 
 	m_Instances.push_back(instance);
-	m_Materials.push_back(record);
+	m_InstanceRecords.push_back(record);
 }
 
 std::span<const Vertex> Scene::vertices(
@@ -100,7 +131,13 @@ std::span<const SceneInstance> Scene::instances(
 std::span<const MaterialRecord> Scene::materials(
 	void) const
 {
-	return m_Materials;
+	return m_MaterialRecords;
+}
+
+std::span<const InstanceRecord> Scene::instanceRecords(
+	void) const
+{
+	return m_InstanceRecords;
 }
 
 FrameConstants Scene::frameConstants(

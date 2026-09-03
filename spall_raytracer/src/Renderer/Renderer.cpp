@@ -300,7 +300,8 @@ spall::Status Renderer::createPipeline(
 		{ConstantsBinding, spall::ResourceBindingType::UniformBuffer, tracingStages},
 		{MaterialBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
 		{VertexBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
-		{AccumulationBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration}};
+		{AccumulationBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration},
+		{InstanceBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit}};
 
 	spall::ResourceSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.Bindings = bindings;
@@ -337,7 +338,7 @@ spall::Status Renderer::createPipeline(
 		return status;
 	}
 
-	spall::ResourceWrite writes[6] = {};
+	spall::ResourceWrite writes[7] = {};
 	writes[0].Binding = SceneBinding;
 	writes[0].Type = spall::ResourceBindingType::AccelerationStructure;
 	writes[0].AccelerationStructure = &m_SceneResources.topLevel();
@@ -356,6 +357,9 @@ spall::Status Renderer::createPipeline(
 	writes[5].Binding = AccumulationBinding;
 	writes[5].Type = spall::ResourceBindingType::StorageTexture;
 	writes[5].TextureView = m_AccumulationView.get();
+	writes[6].Binding = InstanceBinding;
+	writes[6].Type = spall::ResourceBindingType::StorageBuffer;
+	writes[6].Buffer = &m_SceneResources.instanceRecordBuffer();
 
 	spall::ResourceSetCreateInfo setInfo = {};
 	setInfo.Layout = m_ResourceSetLayout.get();

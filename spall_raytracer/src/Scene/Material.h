@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+using MaterialIndex = std::uint32_t;
+
 enum class MaterialType : std::uint32_t
 {
 	Lambertian,
@@ -18,3 +20,10 @@ struct Material
 	glm::vec3 Albedo = {0.8f, 0.8f, 0.8f};
 	MaterialType Type = MaterialType::Lambertian;
 };
+
+inline bool operator==(
+	const Material& a,
+	const Material& b)
+{
+	return (a.Albedo == b.Albedo) and (a.Type == b.Type);
+}

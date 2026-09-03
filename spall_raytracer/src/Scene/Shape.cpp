@@ -32,12 +32,12 @@ void Shape::setScale(
 }
 
 void Shape::setMaterial(
-	const Material& material)
+	MaterialIndex material)
 {
 	m_Material = material;
 }
 
-const Material& Shape::material(
+MaterialIndex Shape::material(
 	void) const
 {
 	return m_Material;
