@@ -19,15 +19,22 @@ void Scene::build(
 	m_Camera.setTarget({0.0f, 0.1f, 0.0f});
 	m_Camera.setFieldOfView(45.0f);
 
-	const MaterialIndex slate = createMaterial({{0.58f, 0.58f, 0.60f}, MaterialType::Lambertian});
-	const MaterialIndex chrome = createMaterial({{0.95f, 0.95f, 0.97f}, MaterialType::Mirror});
-	const MaterialIndex brass = createMaterial({{0.94f, 0.76f, 0.38f}, MaterialType::Mirror});
+	const MaterialIndex slate = createMaterial({.Albedo = {0.58f, 0.58f, 0.60f}, .Roughness = 0.32f});
+	const MaterialIndex chrome = createMaterial({.Albedo = {0.95f, 0.95f, 0.97f}, .Roughness = 0.04f, .Metallic = 1.0f});
+	const MaterialIndex brass = createMaterial({.Albedo = {0.94f, 0.76f, 0.38f}, .Roughness = 0.22f, .Metallic = 1.0f});
 
-	const MaterialIndex tints[] = {
-		createMaterial({{0.85f, 0.34f, 0.14f}, MaterialType::Lambertian}),
-		createMaterial({{0.22f, 0.48f, 0.36f}, MaterialType::Lambertian}),
-		createMaterial({{0.28f, 0.36f, 0.68f}, MaterialType::Lambertian}),
-		createMaterial({{0.74f, 0.70f, 0.32f}, MaterialType::Lambertian})};
+	const MaterialIndex glass = createMaterial({.Albedo = {0.92f, 0.97f, 0.95f},
+		.Roughness = 0.0f,
+		.Transmission = 1.0f,
+		.Ior = 1.52f});
+
+	const MaterialIndex lamp = createMaterial({.Emission = {14.0f, 8.6f, 4.2f}});
+
+	const glm::vec3 palette[] = {
+		{0.85f, 0.34f, 0.14f},
+		{0.22f, 0.48f, 0.36f},
+		{0.28f, 0.36f, 0.68f},
+		{0.74f, 0.70f, 0.32f}};
 
 	Plane ground;
 	ground.setPosition({0.0f, -0.5f, 0.0f});
@@ -47,6 +54,18 @@ void Scene::build(
 	gold.setMaterial(brass);
 	add(gold);
 
+	Sphere bubble;
+	bubble.setPosition({2.2f, 0.1f, -1.0f});
+	bubble.setScale(1.2f);
+	bubble.setMaterial(glass);
+	add(bubble);
+
+	Sphere lantern;
+	lantern.setPosition({-1.3f, 1.5f, -2.4f});
+	lantern.setScale(0.45f);
+	lantern.setMaterial(lamp);
+	add(lantern);
+
 	std::mt19937 noise(0x2545f491u);
 	std::uniform_real_distribution<float> unit(0.0f, 1.0f);
 
@@ -60,15 +79,29 @@ void Scene::build(
 			const float pick = unit(noise);
 
 			if ((std::sqrt((x * x) + (z * z)) < 1.5f) or
-				(std::sqrt(((x + 2.1f) * (x + 2.1f)) + ((z + 0.6f) * (z + 0.6f))) < 1.2f))
+				(std::sqrt(((x + 2.1f) * (x + 2.1f)) + ((z + 0.6f) * (z + 0.6f))) < 1.2f) or
+				(std::sqrt(((x - 2.2f) * (x - 2.2f)) + ((z + 1.0f) * (z + 1.0f))) < 1.3f))
 			{
 				continue;
+			}
+
+			MaterialIndex material = glass;
+
+			if (pick > 0.13f)
+			{
+				material = createMaterial({.Albedo = palette[static_cast<std::size_t>(unit(noise) * 4.0f) % 4],
+					.Roughness = 0.04f + (unit(noise) * 0.8f),
+					.Metallic = (pick < 0.42f) ? 1.0f : 0.0f});
+			}
+			else if (pick > 0.09f)
+			{
+				material = lamp;
 			}
 
 			Sphere ball;
 			ball.setPosition({x, -0.5f + (diameter * 0.5f), z});
 			ball.setScale(diameter);
-			ball.setMaterial((pick < 0.12f) ? chrome : tints[static_cast<std::size_t>(pick * 4.0f) % 4]);
+			ball.setMaterial(material);
 			add(ball);
 		}
 	}
@@ -85,8 +118,12 @@ MaterialIndex Scene::createMaterial(
 	}
 
 	MaterialRecord record = {};
-	record.Albedo = glm::vec4(material.Albedo, 0.0f);
-	record.Type = static_cast<std::uint32_t>(material.Type);
+	record.Albedo = material.Albedo;
+	record.Roughness = material.Roughness;
+	record.Emission = material.Emission;
+	record.Metallic = material.Metallic;
+	record.Transmission = material.Transmission;
+	record.Ior = material.Ior;
 
 	m_Materials.push_back(material);
 	m_MaterialRecords.push_back(record);
@@ -209,7 +246,7 @@ FrameConstants Scene::frameConstants(
 	FrameConstants constants = {};
 	constants.Camera = m_Camera.view(aspectRatio);
 	constants.LightDirection = glm::vec4(glm::normalize(m_LightDirection), 0.0f);
-	constants.LightColor = glm::vec4(m_LightColor, m_Ambient);
+	constants.LightColor = glm::vec4(m_LightColor, m_SkyIntensity);
 
 	return constants;
 }

@@ -28,9 +28,13 @@ struct SceneInstance
 
 struct MaterialRecord
 {
-	glm::vec4 Albedo;
-	std::uint32_t Type;
-	std::uint32_t Unused[3];
+	glm::vec3 Albedo;
+	float Roughness;
+	glm::vec3 Emission;
+	float Metallic;
+	float Transmission;
+	float Ior;
+	std::uint32_t Unused[2];
 };
 
 struct InstanceRecord
@@ -71,6 +75,6 @@ private:
 
 	Camera m_Camera;
 	glm::vec3 m_LightDirection = {0.4f, 0.8f, -0.45f};
-	glm::vec3 m_LightColor = {1.0f, 0.96f, 0.9f};
-	float m_Ambient = 0.08f;
+	glm::vec3 m_LightColor = {3.1f, 2.98f, 2.79f};
+	float m_SkyIntensity = 1.0f;
 };

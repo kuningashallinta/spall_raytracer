@@ -9,21 +9,14 @@
 
 using MaterialIndex = std::uint32_t;
 
-enum class MaterialType : std::uint32_t
-{
-	Lambertian,
-	Mirror
-};
-
 struct Material
 {
 	glm::vec3 Albedo = {0.8f, 0.8f, 0.8f};
-	MaterialType Type = MaterialType::Lambertian;
-};
+	float Roughness = 1.0f;
+	float Metallic = 0.0f;
+	glm::vec3 Emission = {0.0f, 0.0f, 0.0f};
+	float Transmission = 0.0f;
+	float Ior = 1.5f;
 
-inline bool operator==(
-	const Material& a,
-	const Material& b)
-{
-	return (a.Albedo == b.Albedo) and (a.Type == b.Type);
-}
+	bool operator==(const Material&) const = default;
+};

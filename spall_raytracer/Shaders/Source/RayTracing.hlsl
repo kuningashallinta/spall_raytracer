@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: 2026 King Hallinta
 // SPDX-License-Identifier: Apache-2.0
 
-#define MaterialLambertian 0
-#define MaterialMirror 1
-#define MaxBounces 2
+#define MaxBounces 8
+#define Pi 3.14159265358979f
 
 struct Vertex
 {
@@ -13,9 +12,13 @@ struct Vertex
 
 struct MaterialRecord
 {
-	float4 Albedo;
-	uint Type;
-	uint3 Unused;
+	float3 Albedo;
+	float Roughness;
+	float3 Emission;
+	float Metallic;
+	float Transmission;
+	float Ior;
+	uint2 Unused;
 };
 
 struct InstanceRecord
@@ -31,6 +34,7 @@ struct RayPayload
 	float3 Attenuation;
 	float3 ScatterOrigin;
 	float3 ScatterDirection;
+	uint Seed;
 	uint Scatter;
 };
 
@@ -81,6 +85,31 @@ struct PushConstants
 	ConstantBuffer<PushConstants> Push : register(b13);
 #endif
 
+static uint pcg(
+	inout uint state)
+{
+	state = (state * 747796405u) + 2891336453u;
+
+	const uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+
+	return (word >> 22u) ^ word;
+}
+
+static uint seed(
+	uint2 pixel,
+	uint frame)
+{
+	uint state = (pixel.x * 73856093u) ^ (pixel.y * 19349663u) ^ (frame * 83492791u);
+
+	return pcg(state);
+}
+
+static float random(
+	inout uint state)
+{
+	return float(pcg(state)) * 2.3283064365386963e-10f;
+}
+
 static float radicalInverse(
 	uint bits)
 {
@@ -109,6 +138,91 @@ static float halton3(
 	return result;
 }
 
+static float3x3 basis(
+	float3 normal)
+{
+	const float3 up = (abs(normal.z) < 0.999f) ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
+	const float3 tangent = normalize(cross(up, normal));
+
+	return float3x3(tangent, cross(normal, tangent), normal);
+}
+
+static float3 cosineHemisphere(
+	float3 normal,
+	inout uint state)
+{
+	const float angle = random(state) * (2.0f * Pi);
+	const float radius = sqrt(random(state));
+
+	const float3 local = float3(
+		radius * cos(angle),
+		radius * sin(angle),
+		sqrt(saturate(1.0f - (radius * radius))));
+
+	return normalize(mul(local, basis(normal)));
+}
+
+static float3 ggxHalf(
+	float3 normal,
+	float alpha,
+	inout uint state)
+{
+	const float angle = random(state) * (2.0f * Pi);
+	const float u = random(state);
+
+	const float cosine = sqrt((1.0f - u) / (1.0f + (((alpha * alpha) - 1.0f) * u)));
+	const float sine = sqrt(saturate(1.0f - (cosine * cosine)));
+
+	const float3 local = float3(sine * cos(angle), sine * sin(angle), cosine);
+
+	return normalize(mul(local, basis(normal)));
+}
+
+static float ggxDistribution(
+	float cosine,
+	float alpha)
+{
+	const float a2 = alpha * alpha;
+	const float d = ((cosine * cosine) * (a2 - 1.0f)) + 1.0f;
+
+	return a2 / max(Pi * d * d, 1e-7f);
+}
+
+static float smithG1(
+	float cosine,
+	float alpha)
+{
+	const float a2 = alpha * alpha;
+
+	return (2.0f * cosine) / (cosine + sqrt(a2 + ((1.0f - a2) * cosine * cosine)));
+}
+
+static float3 fresnelSchlick(
+	float3 f0,
+	float cosine)
+{
+	return f0 + ((1.0f - f0) * pow(1.0f - cosine, 5.0f));
+}
+
+static float fresnelDielectric(
+	float cosine,
+	float eta)
+{
+	const float sine = (eta * eta) * (1.0f - (cosine * cosine));
+
+	if (sine >= 1.0f)
+	{
+		return 1.0f;
+	}
+
+	const float transmitted = sqrt(1.0f - sine);
+
+	const float s = ((eta * cosine) - transmitted) / ((eta * cosine) + transmitted);
+	const float p = ((eta * transmitted) - cosine) / ((eta * transmitted) + cosine);
+
+	return 0.5f * ((s * s) + (p * p));
+}
+
 static float3 linearToSrgb(
 	float3 color)
 {
@@ -125,61 +239,130 @@ static float3 worldNormal(
 	return normalize(mul(objectNormal, (float3x3)WorldToObject3x4()));
 }
 
+static float visibility(
+	float3 origin,
+	float3 direction)
+{
+	ShadowPayload shadow;
+	shadow.Occluded = 1;
+
+	RayDesc ray;
+	ray.Origin = origin;
+	ray.Direction = direction;
+	ray.TMin = 0.0f;
+	ray.TMax = 1000.0f;
+
+	TraceRay(
+		Scene,
+		RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+		0xFF,
+		0,
+		0,
+		1,
+		ray,
+		shadow);
+
+	return (shadow.Occluded == 0) ? 1.0f : 0.0f;
+}
+
 static void shade(
 	inout RayPayload payload,
-	float3 normal,
+	float3 surfaceNormal,
 	MaterialRecord material)
 {
-	const float3 position = WorldRayOrigin() + (RayTCurrent() * WorldRayDirection());
+	const float3 direction = WorldRayDirection();
+	const float3 view = -direction;
+	const float3 position = WorldRayOrigin() + (RayTCurrent() * direction);
 
-	if (dot(normal, WorldRayDirection()) > 0.0f)
+	const bool entering = (dot(surfaceNormal, direction) < 0.0f);
+	const float3 normal = entering ? surfaceNormal : -surfaceNormal;
+	const float alpha = max(material.Roughness * material.Roughness, 0.002f);
+
+	payload.Radiance = material.Emission;
+	payload.Attenuation = float3(1.0f, 1.0f, 1.0f);
+	payload.Scatter = 1;
+
+	if (random(payload.Seed) < material.Transmission)
 	{
-		normal = -normal;
-	}
+		const float3 microfacet = ggxHalf(normal, alpha, payload.Seed);
+		const float eta = entering ? (1.0f / material.Ior) : material.Ior;
+		const float reflectance = fresnelDielectric(saturate(dot(view, microfacet)), eta);
 
-	const float3 offset = position + (normal * 0.001f);
+		float3 scatter = refract(direction, microfacet, eta);
 
-	if (material.Type == MaterialMirror)
-	{
-		payload.Radiance = float3(0.0f, 0.0f, 0.0f);
-		payload.Attenuation = material.Albedo.rgb;
-		payload.ScatterOrigin = offset;
-		payload.ScatterDirection = reflect(WorldRayDirection(), normal);
-		payload.Scatter = 1;
+		if ((random(payload.Seed) < reflectance) || (dot(scatter, scatter) < 0.5f))
+		{
+			scatter = reflect(direction, microfacet);
+		}
+		else
+		{
+			payload.Attenuation = material.Albedo;
+		}
+
+		payload.ScatterOrigin = position + (scatter * 0.002f);
+		payload.ScatterDirection = normalize(scatter);
 
 		return;
 	}
 
-	const float lambert = saturate(dot(normal, LightDirection.xyz));
-	float visibility = 0.0f;
+	const float3 f0 = lerp(float3(0.04f, 0.04f, 0.04f), material.Albedo, material.Metallic);
+	const float3 diffuse = material.Albedo * (1.0f - material.Metallic);
 
-	if (lambert > 0.0f)
+	const float ndotv = max(dot(normal, view), 1e-4f);
+	const float ndotl = dot(normal, LightDirection.xyz);
+	const float3 offset = position + (normal * 0.002f);
+
+	if (ndotl > 0.0f)
 	{
-		ShadowPayload shadow;
-		shadow.Occluded = 1;
+		const float shadow = visibility(offset, LightDirection.xyz);
+		const float3 microfacet = normalize(LightDirection.xyz + view);
 
-		RayDesc shadowRay;
-		shadowRay.Origin = offset;
-		shadowRay.Direction = LightDirection.xyz;
-		shadowRay.TMin = 0.0f;
-		shadowRay.TMax = 1000.0f;
+		const float3 specular = (fresnelSchlick(f0, saturate(dot(LightDirection.xyz, microfacet)))
+			* ggxDistribution(saturate(dot(normal, microfacet)), alpha)
+			* smithG1(ndotv, alpha)
+			* smithG1(ndotl, alpha))
+			/ (4.0f * ndotv);
 
-		TraceRay(
-			Scene,
-			RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
-			0xFF,
-			0,
-			0,
-			1,
-			shadowRay,
-			shadow);
-
-		visibility = (shadow.Occluded == 0) ? 1.0f : 0.0f;
+		payload.Radiance += (((diffuse / Pi) * ndotl) + specular) * LightColor.rgb * shadow;
 	}
 
-	payload.Radiance = material.Albedo.rgb * ((LightColor.rgb * lambert * visibility) + LightColor.w);
-	payload.Attenuation = float3(0.0f, 0.0f, 0.0f);
-	payload.Scatter = 0;
+	const float3 reflectance = fresnelSchlick(f0, ndotv);
+
+	const float specularWeight = dot(reflectance, float3(1.0f, 1.0f, 1.0f));
+	const float diffuseWeight = dot(diffuse, float3(1.0f, 1.0f, 1.0f));
+	const float specularChance = specularWeight / max(specularWeight + diffuseWeight, 1e-4f);
+
+	if (random(payload.Seed) < specularChance)
+	{
+		const float3 microfacet = ggxHalf(normal, alpha, payload.Seed);
+		const float3 scatter = reflect(direction, microfacet);
+		const float scatterCosine = dot(normal, scatter);
+
+		if (scatterCosine <= 0.0f)
+		{
+			payload.Scatter = 0;
+
+			return;
+		}
+
+		const float vdoth = saturate(dot(view, microfacet));
+		const float ndoth = max(dot(normal, microfacet), 1e-4f);
+
+		payload.Attenuation = (fresnelSchlick(f0, vdoth)
+			* smithG1(ndotv, alpha)
+			* smithG1(scatterCosine, alpha)
+			* vdoth)
+			/ (ndotv * ndoth * specularChance);
+
+		payload.ScatterOrigin = offset;
+		payload.ScatterDirection = scatter;
+
+		return;
+	}
+
+	payload.Attenuation = diffuse / max(1.0f - specularChance, 1e-4f);
+	payload.ScatterOrigin = offset;
+	payload.ScatterDirection = cosineHemisphere(normal, payload.Seed);
 }
 
 [shader("raygeneration")]
@@ -200,6 +383,7 @@ void rayGenMain(void)
 
 	float3 radiance = float3(0.0f, 0.0f, 0.0f);
 	float3 throughput = float3(1.0f, 1.0f, 1.0f);
+	uint state = seed(pixel, Push.FrameIndex);
 
 	for (uint bounce = 0; bounce < MaxBounces; ++bounce)
 	{
@@ -208,10 +392,12 @@ void rayGenMain(void)
 		payload.Attenuation = float3(0.0f, 0.0f, 0.0f);
 		payload.ScatterOrigin = float3(0.0f, 0.0f, 0.0f);
 		payload.ScatterDirection = float3(0.0f, 0.0f, 0.0f);
+		payload.Seed = state;
 		payload.Scatter = 0;
 
 		TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
 
+		state = payload.Seed;
 		radiance += throughput * payload.Radiance;
 
 		if (payload.Scatter == 0)
@@ -237,7 +423,7 @@ void missMain(
 {
 	const float height = saturate((WorldRayDirection().y * 0.5f) + 0.5f);
 
-	payload.Radiance = lerp(float3(0.62f, 0.70f, 0.86f), float3(0.09f, 0.16f, 0.34f), height);
+	payload.Radiance = lerp(float3(0.62f, 0.70f, 0.86f), float3(0.09f, 0.16f, 0.34f), height) * LightColor.w;
 	payload.Scatter = 0;
 }
 
