@@ -177,7 +177,7 @@ spall::Status Renderer::buildScene(
 		return status;
 	}
 
-	const FrameConstants constants = scene.camera().constants(
+	const FrameConstants constants = scene.frameConstants(
 		static_cast<float>(WindowWidth) / static_cast<float>(WindowHeight));
 
 	status = m_Device->resources().writeBuffer(*m_Constants, std::span {&constants, 1});
@@ -272,10 +272,15 @@ spall::Status Renderer::createPipeline(
 		return status;
 	}
 
+	constexpr spall::ShaderStageFlags tracingStages = spall::ShaderStageFlags::RayGeneration |
+		spall::ShaderStageFlags::Miss | spall::ShaderStageFlags::ClosestHit;
+
 	const spall::ResourceBindingInfo bindings[] = {
-		{SceneBinding, spall::ResourceBindingType::AccelerationStructure, spall::ShaderStageFlags::RayGeneration},
+		{SceneBinding, spall::ResourceBindingType::AccelerationStructure, tracingStages},
 		{OutputBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration},
-		{ConstantsBinding, spall::ResourceBindingType::UniformBuffer, spall::ShaderStageFlags::RayGeneration}};
+		{ConstantsBinding, spall::ResourceBindingType::UniformBuffer, tracingStages},
+		{MaterialBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
+		{VertexBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit}};
 
 	spall::ResourceSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.Bindings = bindings;
@@ -288,7 +293,9 @@ spall::Status Renderer::createPipeline(
 	}
 
 	const spall::IResourceSetLayout* const layouts[] = {m_ResourceSetLayout.get()};
-	const spall::PipelineShaderStageInfo missShaders[] = {{m_MissShader.get(), "missMain"}};
+	const spall::PipelineShaderStageInfo missShaders[] = {
+		{m_MissShader.get(), "missMain"},
+		{m_MissShader.get(), "shadowMissMain"}};
 	const spall::RayTracingHitGroup hitGroups[] = {
 		{{m_ClosestHitShader.get(), "closestHitMain"}, {}, {}},
 		{{m_ClosestHitShader.get(), "proceduralClosestHitMain"}, {}, {m_IntersectionShader.get(), "intersectionMain"}}};
@@ -309,7 +316,7 @@ spall::Status Renderer::createPipeline(
 		return status;
 	}
 
-	spall::ResourceWrite writes[3] = {};
+	spall::ResourceWrite writes[5] = {};
 	writes[0].Binding = SceneBinding;
 	writes[0].Type = spall::ResourceBindingType::AccelerationStructure;
 	writes[0].AccelerationStructure = &m_SceneResources.topLevel();
@@ -319,6 +326,12 @@ spall::Status Renderer::createPipeline(
 	writes[2].Binding = ConstantsBinding;
 	writes[2].Type = spall::ResourceBindingType::UniformBuffer;
 	writes[2].Buffer = m_Constants.get();
+	writes[3].Binding = MaterialBinding;
+	writes[3].Type = spall::ResourceBindingType::StorageBuffer;
+	writes[3].Buffer = &m_SceneResources.materialBuffer();
+	writes[4].Binding = VertexBinding;
+	writes[4].Type = spall::ResourceBindingType::StorageBuffer;
+	writes[4].Buffer = &m_SceneResources.vertexBuffer();
 
 	spall::ResourceSetCreateInfo setInfo = {};
 	setInfo.Layout = m_ResourceSetLayout.get();

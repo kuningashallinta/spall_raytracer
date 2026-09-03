@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <src/Camera/Camera.h>
+#include <src/Scene/FrameConstants.h>
 #include <src/Scene/Shape.h>
 
 #include <cstdint>
@@ -20,6 +20,14 @@ struct SceneInstance
 	std::uint32_t GeometryCount;
 };
 
+struct MaterialRecord
+{
+	glm::vec4 Albedo;
+	std::uint32_t Type;
+	std::uint32_t FirstVertex;
+	std::uint32_t Unused[2];
+};
+
 class Scene
 {
 public:
@@ -29,11 +37,18 @@ public:
 	std::span<const Vertex> vertices(void) const;
 	std::span<const spall::AccelerationStructureAabb> aabbs(void) const;
 	std::span<const SceneInstance> instances(void) const;
-	const Camera& camera(void) const;
+	std::span<const MaterialRecord> materials(void) const;
+
+	FrameConstants frameConstants(float aspectRatio) const;
 
 private:
 	std::vector<Vertex> m_Vertices;
 	std::vector<spall::AccelerationStructureAabb> m_Aabbs;
 	std::vector<SceneInstance> m_Instances;
+	std::vector<MaterialRecord> m_Materials;
+
 	Camera m_Camera;
+	glm::vec3 m_LightDirection = {0.4f, 0.8f, -0.45f};
+	glm::vec3 m_LightColor = {1.0f, 0.96f, 0.9f};
+	float m_Ambient = 0.08f;
 };

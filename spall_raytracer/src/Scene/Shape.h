@@ -5,6 +5,7 @@
 
 #include <spall/Resources/AccelerationStructure/AccelerationStructureAabb.h>
 
+#include <src/Scene/Material.h>
 #include <src/Scene/Vertex.h>
 
 #include <glm/vec3.hpp>
@@ -27,8 +28,10 @@ public:
 	void setRotation(const glm::vec3& degrees);
 	void setScale(const glm::vec3& scale);
 	void setScale(float scale);
+	void setMaterial(const Material& material);
 
 	void writeTransform(float (&transform)[12]) const;
+	const Material& material(void) const;
 
 	virtual GeometryType geometryType(void) const = 0;
 	virtual std::span<const Vertex> vertices(void) const = 0;
@@ -38,4 +41,5 @@ private:
 	glm::vec3 m_Position = {0.0f, 0.0f, 0.0f};
 	glm::vec3 m_Rotation = {0.0f, 0.0f, 0.0f};
 	glm::vec3 m_Scale = {1.0f, 1.0f, 1.0f};
+	Material m_Material;
 };

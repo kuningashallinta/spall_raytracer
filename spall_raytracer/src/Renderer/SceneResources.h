@@ -24,11 +24,14 @@ public:
 	spall::Status recordBuilds(spall::ICommandList& commands);
 
 	spall::IAccelerationStructure& topLevel(void) const;
+	spall::IBuffer& vertexBuffer(void) const;
+	spall::IBuffer& materialBuffer(void) const;
 
 private:
 	spall::Resource<spall::IBuffer> m_Vertices;
 	spall::Resource<spall::IBuffer> m_Aabbs;
 	spall::Resource<spall::IBuffer> m_Instances;
+	spall::Resource<spall::IBuffer> m_Materials;
 
 	std::vector<spall::Resource<spall::IAccelerationStructure>> m_BottomLevel;
 	spall::Resource<spall::IAccelerationStructure> m_TopLevel;

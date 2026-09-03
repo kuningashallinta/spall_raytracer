@@ -24,7 +24,7 @@ void Camera::setFieldOfView(
 	m_FieldOfView = degrees;
 }
 
-FrameConstants Camera::constants(
+View Camera::view(
 	float aspectRatio) const
 {
 	const glm::vec3 worldUp = {0.0f, 1.0f, 0.0f};
@@ -33,11 +33,11 @@ FrameConstants Camera::constants(
 	const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
 	const glm::vec3 up = glm::cross(right, forward);
 
-	FrameConstants constants = {};
-	constants.Origin = glm::vec4(m_Position, glm::tan(glm::radians(m_FieldOfView) * 0.5f));
-	constants.Forward = glm::vec4(forward, aspectRatio);
-	constants.Right = glm::vec4(right, 0.0f);
-	constants.Up = glm::vec4(up, 0.0f);
+	View view = {};
+	view.Origin = glm::vec4(m_Position, glm::tan(glm::radians(m_FieldOfView) * 0.5f));
+	view.Forward = glm::vec4(forward, aspectRatio);
+	view.Right = glm::vec4(right, 0.0f);
+	view.Up = glm::vec4(up, 0.0f);
 
-	return constants;
+	return view;
 }

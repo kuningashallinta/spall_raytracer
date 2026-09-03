@@ -20,7 +20,7 @@ spall::Status SceneResources::initialize(
 
 	spall::BufferCreateInfo vertexInfo = {};
 	vertexInfo.Size = static_cast<std::uint32_t>(vertices.size_bytes());
-	vertexInfo.Usage = spall::BufferUsageFlags::AccelerationStructureInput;
+	vertexInfo.Usage = spall::BufferUsageFlags::AccelerationStructureInput | spall::BufferUsageFlags::Storage;
 
 	spall::Status status = device.resources().createBufferWithData(
 		vertexInfo,
@@ -117,6 +117,19 @@ spall::Status SceneResources::initialize(
 		return status;
 	}
 
+	const std::span<const MaterialRecord> materials = scene.materials();
+
+	spall::BufferCreateInfo materialInfo = {};
+	materialInfo.Size = static_cast<std::uint32_t>(materials.size_bytes());
+	materialInfo.Usage = spall::BufferUsageFlags::Storage;
+
+	status = device.resources().createBufferWithData(materialInfo, std::as_bytes(materials), &m_Materials);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
 	spall::AccelerationStructureCreateInfo topLevelInfo = {};
 	topLevelInfo.Type = spall::AccelerationStructureType::TopLevel;
 	topLevelInfo.InstanceBuffer = m_Instances.get();
@@ -145,4 +158,16 @@ spall::IAccelerationStructure& SceneResources::topLevel(
 	void) const
 {
 	return *m_TopLevel;
+}
+
+spall::IBuffer& SceneResources::vertexBuffer(
+	void) const
+{
+	return *m_Vertices;
+}
+
+spall::IBuffer& SceneResources::materialBuffer(
+	void) const
+{
+	return *m_Materials;
 }

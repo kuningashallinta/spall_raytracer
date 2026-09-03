@@ -7,6 +7,8 @@
 #include <src/Scene/Plane.h>
 #include <src/Scene/Sphere.h>
 
+#include <glm/geometric.hpp>
+
 void Scene::build(
 	void)
 {
@@ -17,13 +19,16 @@ void Scene::build(
 	Plane ground;
 	ground.setPosition({0.0f, -0.5f, 0.0f});
 	ground.setScale({12.0f, 1.0f, 12.0f});
+	ground.setMaterial({{0.58f, 0.58f, 0.60f}, MaterialType::Lambertian});
 
 	Cube cube;
 	cube.setRotation({0.0f, 22.0f, 0.0f});
+	cube.setMaterial({{0.85f, 0.34f, 0.14f}, MaterialType::Lambertian});
 
 	Sphere sphere;
 	sphere.setPosition({1.4f, 0.25f, 0.2f});
 	sphere.setScale(1.5f);
+	sphere.setMaterial({{0.95f, 0.95f, 0.97f}, MaterialType::Mirror});
 
 	add(ground);
 	add(cube);
@@ -39,6 +44,10 @@ void Scene::add(
 	instance.InstanceId = static_cast<std::uint32_t>(m_Instances.size());
 	instance.Type = shape.geometryType();
 
+	MaterialRecord record = {};
+	record.Albedo = glm::vec4(shape.material().Albedo, 0.0f);
+	record.Type = static_cast<std::uint32_t>(shape.material().Type);
+
 	switch (instance.Type)
 	{
 		case GeometryType::Triangles:
@@ -48,6 +57,8 @@ void Scene::add(
 			instance.InstanceContribution = 0;
 			instance.GeometryOffset = static_cast<std::uint32_t>(m_Vertices.size() * sizeof(Vertex));
 			instance.GeometryCount = static_cast<std::uint32_t>(vertices.size());
+
+			record.FirstVertex = static_cast<std::uint32_t>(m_Vertices.size());
 
 			m_Vertices.insert(m_Vertices.end(), vertices.begin(), vertices.end());
 			break;
@@ -65,6 +76,7 @@ void Scene::add(
 	}
 
 	m_Instances.push_back(instance);
+	m_Materials.push_back(record);
 }
 
 std::span<const Vertex> Scene::vertices(
@@ -85,8 +97,19 @@ std::span<const SceneInstance> Scene::instances(
 	return m_Instances;
 }
 
-const Camera& Scene::camera(
+std::span<const MaterialRecord> Scene::materials(
 	void) const
 {
-	return m_Camera;
+	return m_Materials;
+}
+
+FrameConstants Scene::frameConstants(
+	float aspectRatio) const
+{
+	FrameConstants constants = {};
+	constants.Camera = m_Camera.view(aspectRatio);
+	constants.LightDirection = glm::vec4(glm::normalize(m_LightDirection), 0.0f);
+	constants.LightColor = glm::vec4(m_LightColor, m_Ambient);
+
+	return constants;
 }

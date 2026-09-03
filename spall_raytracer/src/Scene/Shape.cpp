@@ -31,6 +31,18 @@ void Shape::setScale(
 	m_Scale = glm::vec3(scale);
 }
 
+void Shape::setMaterial(
+	const Material& material)
+{
+	m_Material = material;
+}
+
+const Material& Shape::material(
+	void) const
+{
+	return m_Material;
+}
+
 void Shape::writeTransform(
 	float (&transform)[12]) const
 {

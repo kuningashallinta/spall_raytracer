@@ -18,7 +18,9 @@ inline constexpr std::uint32_t WindowHeight = 720;
 inline constexpr std::uint32_t SceneBinding = 0;
 inline constexpr std::uint32_t OutputBinding = 1;
 inline constexpr std::uint32_t ConstantsBinding = 2;
+inline constexpr std::uint32_t MaterialBinding = 3;
+inline constexpr std::uint32_t VertexBinding = 4;
 
-inline constexpr std::uint32_t MaxPayloadSize = 16;
+inline constexpr std::uint32_t MaxPayloadSize = 64;
 inline constexpr std::uint32_t MaxAttributeSize = 12;
 inline constexpr std::uint32_t MaxRecursionDepth = 2;

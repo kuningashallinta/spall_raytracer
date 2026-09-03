@@ -6,7 +6,7 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
-struct FrameConstants
+struct View
 {
 	glm::vec4 Origin;
 	glm::vec4 Forward;
@@ -21,7 +21,7 @@ public:
 	void setTarget(const glm::vec3& target);
 	void setFieldOfView(float degrees);
 
-	FrameConstants constants(float aspectRatio) const;
+	View view(float aspectRatio) const;
 
 private:
 	glm::vec3 m_Position = {0.0f, 0.0f, -1.0f};
