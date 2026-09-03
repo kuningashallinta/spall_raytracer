@@ -10,5 +10,5 @@ class Sphere : public Shape
 public:
 	GeometryType geometryType(void) const override;
 	std::span<const Vertex> vertices(void) const override;
-	spall::AccelerationStructureAabb bounds(void) const override;
+	std::span<const spall::AccelerationStructureAabb> aabbs(void) const override;
 };

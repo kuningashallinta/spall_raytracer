@@ -36,7 +36,7 @@ public:
 
 	virtual GeometryType geometryType(void) const = 0;
 	virtual std::span<const Vertex> vertices(void) const = 0;
-	virtual spall::AccelerationStructureAabb bounds(void) const = 0;
+	virtual std::span<const spall::AccelerationStructureAabb> aabbs(void) const = 0;
 
 private:
 	glm::vec3 m_Position = {0.0f, 0.0f, 0.0f};

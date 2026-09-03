@@ -48,22 +48,24 @@ spall::Status SceneResources::initialize(
 		}
 	}
 
-	m_BottomLevel.resize(instances.size());
+	const std::span<const SceneGeometry> geometries = scene.geometries();
 
-	for (std::size_t i = 0; i < instances.size(); ++i)
+	m_BottomLevel.resize(geometries.size());
+
+	for (std::size_t i = 0; i < geometries.size(); ++i)
 	{
 		spall::AccelerationStructureGeometry geometry = {};
 
-		switch (instances[i].Type)
+		switch (geometries[i].Type)
 		{
 			case GeometryType::Triangles:
 			{
 				geometry.Type = spall::AccelerationStructureGeometryType::Triangles;
 				geometry.VertexBuffer = m_Vertices.get();
 				geometry.VertexFormat = spall::Format::RGB32Float;
-				geometry.VertexOffset = instances[i].GeometryOffset;
+				geometry.VertexOffset = geometries[i].Offset;
 				geometry.VertexStride = sizeof(Vertex);
-				geometry.VertexCount = instances[i].GeometryCount;
+				geometry.VertexCount = geometries[i].Count;
 				break;
 			}
 
@@ -71,8 +73,8 @@ spall::Status SceneResources::initialize(
 			{
 				geometry.Type = spall::AccelerationStructureGeometryType::Aabbs;
 				geometry.AabbBuffer = m_Aabbs.get();
-				geometry.AabbOffset = instances[i].GeometryOffset;
-				geometry.AabbCount = instances[i].GeometryCount;
+				geometry.AabbOffset = geometries[i].Offset;
+				geometry.AabbCount = geometries[i].Count;
 				break;
 			}
 		}
@@ -92,15 +94,15 @@ spall::Status SceneResources::initialize(
 	std::vector<spall::AccelerationStructureInstance> records;
 	records.reserve(instances.size());
 
-	for (std::size_t i = 0; i < instances.size(); ++i)
+	for (const SceneInstance& instance : instances)
 	{
 		records.push_back(spall::makeAccelerationStructureInstance(
-			*m_BottomLevel[i],
-			reinterpret_cast<const float (&)[12]>(instances[i].Transform),
-			instances[i].InstanceId,
+			*m_BottomLevel[instance.GeometryIndex],
+			reinterpret_cast<const float (&)[12]>(instance.Transform),
+			instance.InstanceId,
 			0xFF,
 			spall::AccelerationStructureInstanceFlags::None,
-			instances[i].InstanceContribution));
+			instance.InstanceContribution));
 	}
 
 	spall::BufferCreateInfo instanceInfo = {};

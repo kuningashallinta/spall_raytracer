@@ -10,14 +10,20 @@
 #include <span>
 #include <vector>
 
+struct SceneGeometry
+{
+	const void* Source;
+	GeometryType Type;
+	std::uint32_t Offset;
+	std::uint32_t Count;
+};
+
 struct SceneInstance
 {
 	glm::mat3x4 Transform;
 	std::uint32_t InstanceId;
 	std::uint32_t InstanceContribution;
-	GeometryType Type;
-	std::uint32_t GeometryOffset;
-	std::uint32_t GeometryCount;
+	std::uint32_t GeometryIndex;
 };
 
 struct MaterialRecord
@@ -44,6 +50,7 @@ public:
 
 	std::span<const Vertex> vertices(void) const;
 	std::span<const spall::AccelerationStructureAabb> aabbs(void) const;
+	std::span<const SceneGeometry> geometries(void) const;
 	std::span<const SceneInstance> instances(void) const;
 	std::span<const MaterialRecord> materials(void) const;
 	std::span<const InstanceRecord> instanceRecords(void) const;
@@ -51,8 +58,11 @@ public:
 	FrameConstants frameConstants(float aspectRatio) const;
 
 private:
+	std::uint32_t addGeometry(const Shape& shape);
+
 	std::vector<Vertex> m_Vertices;
 	std::vector<spall::AccelerationStructureAabb> m_Aabbs;
+	std::vector<SceneGeometry> m_Geometries;
 	std::vector<SceneInstance> m_Instances;
 
 	std::vector<Material> m_Materials;

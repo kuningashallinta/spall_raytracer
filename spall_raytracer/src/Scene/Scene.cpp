@@ -94,29 +94,35 @@ MaterialIndex Scene::createMaterial(
 	return static_cast<MaterialIndex>(m_Materials.size() - 1);
 }
 
-void Scene::add(
+std::uint32_t Scene::addGeometry(
 	const Shape& shape)
 {
-	SceneInstance instance = {};
-	instance.Transform = shape.transform();
+	const GeometryType type = shape.geometryType();
+	const std::span<const Vertex> vertices = shape.vertices();
+	const std::span<const spall::AccelerationStructureAabb> aabbs = shape.aabbs();
 
-	instance.InstanceId = static_cast<std::uint32_t>(m_Instances.size());
-	instance.Type = shape.geometryType();
+	const void* const source = (type == GeometryType::Triangles)
+		? static_cast<const void*>(vertices.data())
+		: static_cast<const void*>(aabbs.data());
 
-	InstanceRecord record = {};
-	record.MaterialIndex = shape.material();
+	for (std::size_t i = 0; i < m_Geometries.size(); ++i)
+	{
+		if ((m_Geometries[i].Source == source) and (m_Geometries[i].Type == type))
+		{
+			return static_cast<std::uint32_t>(i);
+		}
+	}
 
-	switch (instance.Type)
+	SceneGeometry geometry = {};
+	geometry.Source = source;
+	geometry.Type = type;
+
+	switch (type)
 	{
 		case GeometryType::Triangles:
 		{
-			const std::span<const Vertex> vertices = shape.vertices();
-
-			instance.InstanceContribution = 0;
-			instance.GeometryOffset = static_cast<std::uint32_t>(m_Vertices.size() * sizeof(Vertex));
-			instance.GeometryCount = static_cast<std::uint32_t>(vertices.size());
-
-			record.FirstVertex = static_cast<std::uint32_t>(m_Vertices.size());
+			geometry.Offset = static_cast<std::uint32_t>(m_Vertices.size() * sizeof(Vertex));
+			geometry.Count = static_cast<std::uint32_t>(vertices.size());
 
 			m_Vertices.insert(m_Vertices.end(), vertices.begin(), vertices.end());
 			break;
@@ -124,13 +130,37 @@ void Scene::add(
 
 		case GeometryType::Aabbs:
 		{
-			instance.InstanceContribution = 1;
-			instance.GeometryOffset = static_cast<std::uint32_t>(m_Aabbs.size() * sizeof(spall::AccelerationStructureAabb));
-			instance.GeometryCount = 1;
+			geometry.Offset = static_cast<std::uint32_t>(m_Aabbs.size() * sizeof(spall::AccelerationStructureAabb));
+			geometry.Count = static_cast<std::uint32_t>(aabbs.size());
 
-			m_Aabbs.push_back(shape.bounds());
+			m_Aabbs.insert(m_Aabbs.end(), aabbs.begin(), aabbs.end());
 			break;
 		}
+	}
+
+	m_Geometries.push_back(geometry);
+
+	return static_cast<std::uint32_t>(m_Geometries.size() - 1);
+}
+
+void Scene::add(
+	const Shape& shape)
+{
+	const std::uint32_t geometryIndex = addGeometry(shape);
+	const SceneGeometry& geometry = m_Geometries[geometryIndex];
+
+	SceneInstance instance = {};
+	instance.Transform = shape.transform();
+	instance.InstanceId = static_cast<std::uint32_t>(m_Instances.size());
+	instance.InstanceContribution = (geometry.Type == GeometryType::Triangles) ? 0u : 1u;
+	instance.GeometryIndex = geometryIndex;
+
+	InstanceRecord record = {};
+	record.MaterialIndex = shape.material();
+
+	if (geometry.Type == GeometryType::Triangles)
+	{
+		record.FirstVertex = geometry.Offset / sizeof(Vertex);
 	}
 
 	m_Instances.push_back(instance);
@@ -147,6 +177,12 @@ std::span<const spall::AccelerationStructureAabb> Scene::aabbs(
 	void) const
 {
 	return m_Aabbs;
+}
+
+std::span<const SceneGeometry> Scene::geometries(
+	void) const
+{
+	return m_Geometries;
 }
 
 std::span<const SceneInstance> Scene::instances(

@@ -51,8 +51,8 @@ std::span<const Vertex> Cube::vertices(
 	return vertices;
 }
 
-spall::AccelerationStructureAabb Cube::bounds(
+std::span<const spall::AccelerationStructureAabb> Cube::aabbs(
 	void) const
 {
-	return {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
+	return {};
 }

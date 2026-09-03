@@ -23,8 +23,8 @@ std::span<const Vertex> Plane::vertices(
 	return vertices;
 }
 
-spall::AccelerationStructureAabb Plane::bounds(
+std::span<const spall::AccelerationStructureAabb> Plane::aabbs(
 	void) const
 {
-	return {-0.5f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f};
+	return {};
 }

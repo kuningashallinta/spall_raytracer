@@ -15,8 +15,10 @@ std::span<const Vertex> Sphere::vertices(
 	return {};
 }
 
-spall::AccelerationStructureAabb Sphere::bounds(
+std::span<const spall::AccelerationStructureAabb> Sphere::aabbs(
 	void) const
 {
-	return {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
+	static const spall::AccelerationStructureAabb box = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
+
+	return {&box, 1};
 }
