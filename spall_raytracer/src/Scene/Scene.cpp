@@ -71,7 +71,7 @@ void Scene::add(
 	const Shape& shape)
 {
 	SceneInstance instance = {};
-	shape.writeTransform(instance.Transform);
+	instance.Transform = shape.transform();
 
 	instance.InstanceId = static_cast<std::uint32_t>(m_Instances.size());
 	instance.Type = shape.geometryType();

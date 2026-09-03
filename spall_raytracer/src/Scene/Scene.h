@@ -12,7 +12,7 @@
 
 struct SceneInstance
 {
-	float Transform[12];
+	glm::mat3x4 Transform;
 	std::uint32_t InstanceId;
 	std::uint32_t InstanceContribution;
 	GeometryType Type;

@@ -8,6 +8,7 @@
 #include <src/Scene/Material.h>
 #include <src/Scene/Vertex.h>
 
+#include <glm/mat3x4.hpp>
 #include <glm/vec3.hpp>
 
 #include <cstdint>
@@ -30,7 +31,7 @@ public:
 	void setScale(float scale);
 	void setMaterial(MaterialIndex material);
 
-	void writeTransform(float (&transform)[12]) const;
+	glm::mat3x4 transform(void) const;
 	MaterialIndex material(void) const;
 
 	virtual GeometryType geometryType(void) const = 0;

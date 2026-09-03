@@ -96,7 +96,7 @@ spall::Status SceneResources::initialize(
 	{
 		records.push_back(spall::makeAccelerationStructureInstance(
 			*m_BottomLevel[i],
-			instances[i].Transform,
+			reinterpret_cast<const float (&)[12]>(instances[i].Transform),
 			instances[i].InstanceId,
 			0xFF,
 			spall::AccelerationStructureInstanceFlags::None,

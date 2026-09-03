@@ -4,7 +4,9 @@
 #include <src/Scene/Shape.h>
 
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/mat4x3.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
 
 void Shape::setPosition(
@@ -43,8 +45,8 @@ MaterialIndex Shape::material(
 	return m_Material;
 }
 
-void Shape::writeTransform(
-	float (&transform)[12]) const
+glm::mat3x4 Shape::transform(
+	void) const
 {
 	glm::mat4 matrix = glm::translate(glm::mat4(1.0f), m_Position);
 
@@ -53,11 +55,5 @@ void Shape::writeTransform(
 	matrix = glm::rotate(matrix, glm::radians(m_Rotation.z), {0.0f, 0.0f, 1.0f});
 	matrix = glm::scale(matrix, m_Scale);
 
-	for (int row = 0; row < 3; ++row)
-	{
-		for (int column = 0; column < 4; ++column)
-		{
-			transform[(row * 4) + column] = matrix[column][row];
-		}
-	}
+	return glm::transpose(glm::mat4x3(matrix));
 }
