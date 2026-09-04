@@ -93,6 +93,24 @@ spall::Status Renderer::initialize(
 		return status;
 	}
 
+	status = m_Bloom.initialize(*m_Device, *m_AccumulationView);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	status = m_Composite.initialize(
+		*m_Device,
+		*m_AccumulationView,
+		m_Bloom.result(),
+		*m_OutputView);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
 	m_CommandLists.resize(m_SwapChain->frameCount());
 
 	return {};
@@ -160,7 +178,7 @@ spall::Status Renderer::createOutput(
 	}
 
 	textureInfo.Format = AccumulationFormat;
-	textureInfo.Usage = spall::TextureUsageFlags::Storage;
+	textureInfo.Usage = spall::TextureUsageFlags::Storage | spall::TextureUsageFlags::Sampled;
 
 	status = m_Device->resources().createTexture2D(textureInfo, &m_Accumulation);
 
@@ -296,12 +314,11 @@ spall::Status Renderer::createPipeline(
 
 	const spall::ResourceBindingInfo bindings[] = {
 		{SceneBinding, spall::ResourceBindingType::AccelerationStructure, tracingStages},
-		{OutputBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration},
 		{ConstantsBinding, spall::ResourceBindingType::UniformBuffer, tracingStages},
 		{MaterialBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
 		{VertexBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
-		{AccumulationBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration},
-		{InstanceBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit}};
+		{InstanceBinding, spall::ResourceBindingType::StorageBuffer, spall::ShaderStageFlags::ClosestHit},
+		{AccumulationBinding, spall::ResourceBindingType::StorageTexture, spall::ShaderStageFlags::RayGeneration}};
 
 	spall::ResourceSetLayoutCreateInfo layoutInfo = {};
 	layoutInfo.Bindings = bindings;
@@ -338,28 +355,25 @@ spall::Status Renderer::createPipeline(
 		return status;
 	}
 
-	spall::ResourceWrite writes[7] = {};
+	spall::ResourceWrite writes[6] = {};
 	writes[0].Binding = SceneBinding;
 	writes[0].Type = spall::ResourceBindingType::AccelerationStructure;
 	writes[0].AccelerationStructure = &m_SceneResources.topLevel();
-	writes[1].Binding = OutputBinding;
-	writes[1].Type = spall::ResourceBindingType::StorageTexture;
-	writes[1].TextureView = m_OutputView.get();
-	writes[2].Binding = ConstantsBinding;
-	writes[2].Type = spall::ResourceBindingType::UniformBuffer;
-	writes[2].Buffer = m_Constants.get();
-	writes[3].Binding = MaterialBinding;
+	writes[1].Binding = ConstantsBinding;
+	writes[1].Type = spall::ResourceBindingType::UniformBuffer;
+	writes[1].Buffer = m_Constants.get();
+	writes[2].Binding = MaterialBinding;
+	writes[2].Type = spall::ResourceBindingType::StorageBuffer;
+	writes[2].Buffer = &m_SceneResources.materialBuffer();
+	writes[3].Binding = VertexBinding;
 	writes[3].Type = spall::ResourceBindingType::StorageBuffer;
-	writes[3].Buffer = &m_SceneResources.materialBuffer();
-	writes[4].Binding = VertexBinding;
+	writes[3].Buffer = &m_SceneResources.vertexBuffer();
+	writes[4].Binding = InstanceBinding;
 	writes[4].Type = spall::ResourceBindingType::StorageBuffer;
-	writes[4].Buffer = &m_SceneResources.vertexBuffer();
+	writes[4].Buffer = &m_SceneResources.instanceRecordBuffer();
 	writes[5].Binding = AccumulationBinding;
 	writes[5].Type = spall::ResourceBindingType::StorageTexture;
 	writes[5].TextureView = m_AccumulationView.get();
-	writes[6].Binding = InstanceBinding;
-	writes[6].Type = spall::ResourceBindingType::StorageBuffer;
-	writes[6].Buffer = &m_SceneResources.instanceRecordBuffer();
 
 	spall::ResourceSetCreateInfo setInfo = {};
 	setInfo.Layout = m_ResourceSetLayout.get();
@@ -422,6 +436,41 @@ spall::Status Renderer::renderFrame(
 	}
 
 	status = commands.dispatchRays(WindowWidth, WindowHeight, 1);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	status = commands.setTextureState(*m_Accumulation, spall::ResourceStateFlags::ShaderResource);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	status = m_Bloom.record(commands);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	status = commands.setTextureState(*m_Accumulation, spall::ResourceStateFlags::UnorderedAccess);
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	status = commands.commitBarriers();
+
+	if (status != spall::SUCCESS)
+	{
+		return status;
+	}
+
+	status = m_Composite.record(commands);
 
 	if (status != spall::SUCCESS)
 	{

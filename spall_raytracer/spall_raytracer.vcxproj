@@ -158,6 +158,8 @@
     <ClCompile Include="src\Camera\Camera.cpp" />
     <ClCompile Include="src\Application\Main.cpp" />
     <ClCompile Include="src\Application\Window.cpp" />
+    <ClCompile Include="src\Renderer\Bloom.cpp" />
+    <ClCompile Include="src\Renderer\Composite.cpp" />
     <ClCompile Include="src\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Renderer\SceneResources.cpp" />
     <ClCompile Include="src\Scene\Scene.cpp" />
@@ -170,6 +172,8 @@
     <ClInclude Include="src\Application\Application.h" />
     <ClInclude Include="src\Application\Window.h" />
     <ClInclude Include="src\Camera\Camera.h" />
+    <ClInclude Include="src\Renderer\Bloom.h" />
+    <ClInclude Include="src\Renderer\Composite.h" />
     <ClInclude Include="src\Renderer\Renderer.h" />
     <ClInclude Include="src\Renderer\RendererConfig.h" />
     <ClInclude Include="src\Renderer\SceneResources.h" />
@@ -190,6 +194,20 @@
       <FileType>Document</FileType>
       <Message>dxc %(Filename)%(Extension)</Message>
       <Command>python "$(MSBuildProjectDirectory)\Shaders\generate.py" --source "%(FullPath)" --output "$(ShaderGeneratedDir.TrimEnd('\'))" --dxil-dxc "$(DxilDxc)" --spirv-dxc "$(SpirvDxc)"</Command>
+      <Outputs>$(ShaderGeneratedDir)%(Filename)Shaders.h</Outputs>
+      <AdditionalInputs>$(MSBuildProjectDirectory)\Shaders\generate.py</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="Shaders\Source\Bloom.hlsl">
+      <FileType>Document</FileType>
+      <Message>dxc %(Filename)%(Extension)</Message>
+      <Command>python "$(MSBuildProjectDirectory)\Shaders\generate.py" --source "%(FullPath)" --output "$(ShaderGeneratedDir.TrimEnd('\'))" --dxil-dxc "$(DxilDxc)" --spirv-dxc "$(SpirvDxc)" --entry thresholdMain --entry downsampleMain --entry upsampleMain</Command>
+      <Outputs>$(ShaderGeneratedDir)%(Filename)Shaders.h</Outputs>
+      <AdditionalInputs>$(MSBuildProjectDirectory)\Shaders\generate.py</AdditionalInputs>
+    </CustomBuild>
+    <CustomBuild Include="Shaders\Source\Composite.hlsl">
+      <FileType>Document</FileType>
+      <Message>dxc %(Filename)%(Extension)</Message>
+      <Command>python "$(MSBuildProjectDirectory)\Shaders\generate.py" --source "%(FullPath)" --output "$(ShaderGeneratedDir.TrimEnd('\'))" --dxil-dxc "$(DxilDxc)" --spirv-dxc "$(SpirvDxc)" --entry compositeMain</Command>
       <Outputs>$(ShaderGeneratedDir)%(Filename)Shaders.h</Outputs>
       <AdditionalInputs>$(MSBuildProjectDirectory)\Shaders\generate.py</AdditionalInputs>
     </CustomBuild>

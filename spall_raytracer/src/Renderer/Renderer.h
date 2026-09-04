@@ -17,6 +17,8 @@
 #include <spall/Resources/TextureView/ITextureView.h>
 #include <spall/SwapChain/ISwapChain.h>
 
+#include <src/Renderer/Bloom.h>
+#include <src/Renderer/Composite.h>
 #include <src/Renderer/SceneResources.h>
 
 #include <windows.h>
@@ -59,6 +61,9 @@ private:
 	spall::Resource<spall::IResourceSetLayout> m_ResourceSetLayout;
 	spall::Resource<spall::IResourceSet> m_ResourceSet;
 	spall::Resource<spall::IPipeline> m_Pipeline;
+
+	Bloom m_Bloom;
+	Composite m_Composite;
 
 	std::vector<spall::Resource<spall::ICommandList>> m_CommandLists;
 	std::uint32_t m_FrameIndex = 0;

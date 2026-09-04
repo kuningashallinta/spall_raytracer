@@ -8,12 +8,12 @@ import subprocess
 import sys
 
 
-def compile_shader(dxc, arguments, source, output):
+def compile_shader(dxc, profile, arguments, source, output):
     if not os.path.isfile(dxc):
         sys.stderr.write("dxc not found: %s\n" % dxc)
         raise SystemExit(1)
 
-    command = [dxc, "-nologo", "-T", "lib_6_3"] + arguments + ["-Fo", output, source]
+    command = [dxc, "-nologo", "-T", profile] + arguments + ["-Fo", output, source]
     result = subprocess.run(command, capture_output=True, text=True)
 
     if result.returncode != 0:
@@ -27,6 +27,29 @@ def compile_shader(dxc, arguments, source, output):
     os.remove(output)
 
     return data
+
+
+def compile_pair(arguments, profile, extra, name):
+    dxil = compile_shader(
+        arguments.dxil_dxc,
+        profile,
+        extra,
+        arguments.source,
+        os.path.join(arguments.output, name + ".cso"),
+    )
+
+    spirv = compile_shader(
+        arguments.spirv_dxc,
+        profile,
+        extra + ["-spirv", "-fspv-target-env=vulkan1.2"],
+        arguments.source,
+        os.path.join(arguments.output, name + ".spv"),
+    )
+
+    if (len(spirv) % 4) != 0:
+        raise SystemExit("SPIR-V size is not a multiple of four")
+
+    return dxil, spirv
 
 
 def byte_array(name, data):
@@ -59,27 +82,21 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--dxil-dxc", required=True)
     parser.add_argument("--spirv-dxc", required=True)
+    parser.add_argument("--entry", action="append", default=[])
     arguments = parser.parse_args()
 
     name = os.path.splitext(os.path.basename(arguments.source))[0]
     os.makedirs(arguments.output, exist_ok=True)
 
-    dxil = compile_shader(
-        arguments.dxil_dxc,
-        [],
-        arguments.source,
-        os.path.join(arguments.output, name + ".cso"),
-    )
+    blobs = []
 
-    spirv = compile_shader(
-        arguments.spirv_dxc,
-        ["-spirv", "-fspv-target-env=vulkan1.2"],
-        arguments.source,
-        os.path.join(arguments.output, name + ".spv"),
-    )
-
-    if (len(spirv) % 4) != 0:
-        raise SystemExit("SPIR-V size is not a multiple of four")
+    if arguments.entry:
+        for entry in arguments.entry:
+            dxil, spirv = compile_pair(arguments, "cs_6_5", ["-E", entry], entry)
+            blobs.append((entry[0].upper() + entry[1:], dxil, spirv))
+    else:
+        dxil, spirv = compile_pair(arguments, "lib_6_3", [], name)
+        blobs.append((name + "Library", dxil, spirv))
 
     header = io.StringIO()
     header.write(
@@ -92,9 +109,15 @@ def main():
     header.write("\n")
     header.write("namespace shaders\n")
     header.write("{\n")
-    header.write(byte_array(name + "Library", dxil))
-    header.write("\n")
-    header.write(word_array(name + "LibrarySpirv", spirv))
+
+    for index, (symbol, dxil, spirv) in enumerate(blobs):
+        if index > 0:
+            header.write("\n")
+
+        header.write(byte_array(symbol, dxil))
+        header.write("\n")
+        header.write(word_array(symbol + "Spirv", spirv))
+
     header.write("} // namespace shaders\n")
 
     path = os.path.join(arguments.output, name + "Shaders.h")
@@ -107,8 +130,8 @@ def main():
         % (
             os.path.basename(arguments.source),
             os.path.basename(path),
-            len(dxil),
-            len(spirv),
+            sum(len(dxil) for _, dxil, _ in blobs),
+            sum(len(spirv) for _, _, spirv in blobs),
         )
     )
 

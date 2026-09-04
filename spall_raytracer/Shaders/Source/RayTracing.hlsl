@@ -50,12 +50,7 @@ struct SphereAttributes
 
 RaytracingAccelerationStructure Scene : register(t0);
 
-#ifdef __spirv__
-	[[vk::image_format("rgba8")]]
-#endif
-RWTexture2D<float4> Output : register(u1);
-
-cbuffer FrameConstants : register(b2)
+cbuffer FrameConstants : register(b1)
 {
 	float4 Origin;
 	float4 Forward;
@@ -65,9 +60,9 @@ cbuffer FrameConstants : register(b2)
 	float4 LightColor;
 };
 
-RWStructuredBuffer<MaterialRecord> Materials : register(u3);
-RWStructuredBuffer<Vertex> Vertices : register(u4);
-RWStructuredBuffer<InstanceRecord> Instances : register(u6);
+RWStructuredBuffer<MaterialRecord> Materials : register(u2);
+RWStructuredBuffer<Vertex> Vertices : register(u3);
+RWStructuredBuffer<InstanceRecord> Instances : register(u4);
 
 #ifdef __spirv__
 	[[vk::image_format("rgba32f")]]
@@ -221,16 +216,6 @@ static float fresnelDielectric(
 	const float p = ((eta * transmitted) - cosine) / ((eta * transmitted) + cosine);
 
 	return 0.5f * ((s * s) + (p * p));
-}
-
-static float3 linearToSrgb(
-	float3 color)
-{
-	const float3 clamped = saturate(color);
-	const float3 low = clamped * 12.92f;
-	const float3 high = (1.055f * pow(clamped, 1.0f / 2.4f)) - 0.055f;
-
-	return lerp(high, low, step(clamped, 0.0031308f));
 }
 
 static float3 worldNormal(
@@ -411,10 +396,8 @@ void rayGenMain(void)
 	}
 
 	const float4 previous = (Push.FrameIndex == 0u) ? float4(0.0f, 0.0f, 0.0f, 0.0f) : Accumulation[pixel];
-	const float4 accumulated = previous + float4(radiance, 1.0f);
 
-	Accumulation[pixel] = accumulated;
-	Output[pixel] = float4(linearToSrgb(accumulated.rgb / accumulated.w), 1.0f);
+	Accumulation[pixel] = previous + float4(radiance, 1.0f);
 }
 
 [shader("miss")]
