@@ -14,8 +14,8 @@ inline constexpr spall::Format OutputFormat = spall::Format::RGBA8;
 inline constexpr spall::Format AccumulationFormat = spall::Format::RGBA32Float;
 inline constexpr spall::Format BloomFormat = spall::Format::RGBA16Float;
 
-inline constexpr std::uint32_t WindowWidth = 1280;
-inline constexpr std::uint32_t WindowHeight = 720;
+inline constexpr std::uint32_t WindowWidth = 1920;
+inline constexpr std::uint32_t WindowHeight = 1080;
 
 inline constexpr std::uint32_t BloomLevels = 5;
 inline constexpr std::uint32_t GroupSize = 8;
